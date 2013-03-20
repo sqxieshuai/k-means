@@ -76,9 +76,10 @@ def getUsersClusters(numk, usernum, movienum, usercenters, userratings):
             #存储ucid的所有评分
             ucidRating = usercenters[ucid]
             tempLen = 0
-            #遍历所有电影编号，求uid和ucid的欧式距离
-            for i in range(1, movienum+1):
-                tempLen += pow(ucidRating.get(i, 0) - uidRating.get(i, 0), 2)
+            #求uid和ucid的欧式距离
+            for mid in ucidRating.keys():
+                tempLen += pow(ucidRating[i] - uidRating.get(i, 0), 2)
+            for mid in set()
             if sqrt(tempLen) < maxLen:
                 (maxLen, minLenUcid) = (sqrt(tempLen), ucid)
         #划入聚类
