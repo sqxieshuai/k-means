@@ -3,7 +3,6 @@
 import os
 import time
 from random import sample
-from operator import itemgetter
 from math import sqrt
 
 
@@ -31,7 +30,7 @@ NUM_USER = 943  #943,6040,71567
 NUM_MOVIE = 1682  #1682,3952,65133
 
 #小数据test
-# FILEPATH_100k_ratings = PATH_HERE + '/demo.txt'
+# FILEPATH_test = PATH_HERE + '/demo.txt'
 # NUM_K = 2
 # NUM_USER = 4
 # NUM_MOVIE = 6
@@ -52,13 +51,15 @@ def loadRatingsDetail(ratingDataFilepath):
 #从评分集合中挑选k个起始点,返回选出的集合
 def chooseKInitCenter(numk, usernum, userratings):
     userCenters = {}
+    #随机挑选k个用户
     userIds = sample(range(1,usernum+1), numk)
     for uid in userIds:
         userCenters[uid] = userratings[uid]
     return userCenters
 
 #在得到初始点集合(是用户集，不是评分集)，以及所有用户评分集合的基础上，用欧式距离进行聚类
-def getUsersClusters(numk, usernum, movienum, usercenters, userratings):
+def getUsersClusters(usernum, movienum, usercenters, userratings):
+    start = time.time()
     clusters = {}
     #所有初始结点的id
     userCenterIds = usercenters.keys()
@@ -72,22 +73,26 @@ def getUsersClusters(numk, usernum, movienum, usercenters, userratings):
         #设置哨兵比较点
         minLenUcid = -1
         maxLen = float("inf")
+        #计算uid和每个ucid的距离，并取距离最短的那一个ucid作为聚类号
         for ucid in userCenterIds:
             #存储ucid的所有评分
             ucidRating = usercenters[ucid]
             tempLen = 0
             #求uid和ucid的欧式距离
             for mid in ucidRating.keys():
-                tempLen += pow(ucidRating[i] - uidRating.get(i, 0), 2)
-            for mid in set()
+                tempLen += pow(ucidRating[mid] - uidRating.get(mid, 0), 2)
+            for mid in (set(uidRating)-set(ucidRating)):
+                tempLen += pow(uidRating[mid], 2)
             if sqrt(tempLen) < maxLen:
                 (maxLen, minLenUcid) = (sqrt(tempLen), ucid)
-        #划入聚类
+        #划入距离最短的聚类
         clusters[minLenUcid].append(uid)
+    print u'聚类',time.time() - start
     return clusters
 
-#重新计算个个聚类的中心
-def getAverageCenters(movienum, ratingsDetail,  usercenters, clusters):
+#重新计算每个聚类的中心
+def getAverageCenters(movienum, ratingsDetail, usercenters, clusters):
+    start = time.time()
     averageCenters = {}
     #循环k个中心点
     for ucid in usercenters.keys():
@@ -105,6 +110,7 @@ def getAverageCenters(movienum, ratingsDetail,  usercenters, clusters):
         for mid in tempUserRatings.keys():
             tempUserRatings[mid] = round(tempUserRatings[mid]/tempLen, 3)
         averageCenters[ucid] = tempUserRatings
+    print u'平均', time.time() - start
     return averageCenters
         
 
@@ -112,9 +118,9 @@ def getAverageCenters(movienum, ratingsDetail,  usercenters, clusters):
 #2.取k个起始点
 #3.用欧式距离进行聚类
 #4.算每个聚类的平均中心
-#5.重复3,4,5步骤，直到聚类中心不再变化
+#5.重复3,4步骤，直到聚类中心不再变化
 
-for i in range(1):
+if __name__ == '__main__':
     start = time.time()
     #获得用户对电影的评分
     ratingsDetail = loadRatingsDetail(FILEPATH_100k_ratings)
@@ -123,37 +129,17 @@ for i in range(1):
     #当平均中心点不等于上一次的中心点时，进行循环
     n = 1
     while True:
-        clustersDetail = getUsersClusters(NUM_K, NUM_USER, NUM_MOVIE, userCentersDetail, ratingsDetail)
-        print "第%s次计算结果：\n聚类编号-类内元素个数:" % n
+        clustersDetail = getUsersClusters(NUM_USER, NUM_MOVIE, userCentersDetail, ratingsDetail)
+        print u"第%s次计算结果：\n聚类编号-类内元素个数:" % n
         for ucid in sorted(clustersDetail.keys()):
             print ucid,'\t',len(clustersDetail[ucid])
         print '********************'
         averageCenters = getAverageCenters(NUM_MOVIE, ratingsDetail, userCentersDetail, clustersDetail)
-        if userCentersDetail == averageCenters:
+        if userCentersDetail == averageCenters: 
             break
         else:
             userCentersDetail = averageCenters
             n += 1
-    
-    #小数据test
-    # print "用户评分:"
-    # for uid in sorted(ratingsDetail.keys()):
-    #     print uid, ratingsDetail[uid]
-    # print '********************************'
-    # print "初始中心点:"
-    # for ucid in sorted(userCentersDetail.keys()):
-    #     print ucid, sorted(userCentersDetail[ucid].items())
-    # print '********************************'
-    # print "聚类:"
-    # for ucid in sorted(clustersDetail.keys()):
-    #     print ucid, clustersDetail[ucid]
-    # print '********************************'
-    # print "平均中心点:"
-    # for ucid in sorted(averageCenters.keys()):
-    #     print ucid, sorted(averageCenters[ucid].items())
-
-    
-    # print sorted(userCentersDetail[userCentersDetail.keys()[0]].items())
 
     timeUsed = time.time() - start
-    print "用时 %s 秒." % timeUsed
+    print u"用时 %s 秒." % timeUsed
