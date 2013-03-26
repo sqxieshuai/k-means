@@ -4,6 +4,7 @@ import os
 
 PATH_HERE = os.path.abspath("").replace("\\", "/")
 
+'''
 #ml-100k folder
 FILEPATH_100k_users = PATH_HERE + "/ml-100k/u.user"
 FILEPATH_100k_ratings = PATH_HERE + "/ml-100k/u.data"
@@ -31,4 +32,6 @@ temp = sorted(set(fc))
 print len(temp),temp[-10::]
 print n
 
-
+'''
+a = os.path.basename()
+print a
