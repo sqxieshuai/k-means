@@ -2,7 +2,7 @@
 
 import os
 import time
-from random import sample
+from random import randint
 from math import sqrt
 
 
@@ -48,13 +48,51 @@ def loadRatingsDetail(ratingDataFilepath):
     fp.close()
     return ratings
 
+#计算一个向量的模,保留三位小数
+def getNorm(uid, userratings):
+    temp = 0
+    for val in userratings[uid].values():
+        temp += pow(val, 2)
+    temp = round(sqrt(temp), 3)
+    return temp
+
 #从评分集合中挑选k个起始点,返回选出的集合
 def chooseKInitCenter(numk, usernum, userratings):
     userCenters = {}
+    userIdNorms = {} #存储中心点的模
+    userIds = []
     #随机挑选k个用户
-    userIds = sample(range(1,usernum+1), numk)
-    for uid in userIds:
-        userCenters[uid] = userratings[uid]
+    while len(userIds) < numk :
+        tempId = randint(1, usernum)
+        if tempId not in userIds :
+            stats = True #记录此点是否可用
+            #对于已经存在的每一个中心点，都和新选取的中心点计算余弦相似度
+            #如果任意一个大于阀值（0.6），就放弃新选取的点
+            for ucid in userIds:
+                #计算余弦相似度，先计算分子
+                temp1 = 0 #余弦相似度的分子
+                for mid in userratings[ucid]:
+                    temp1 += userratings[ucid][mid] * userratings[tempId].get(mid, 0)
+                #计算分母，分别计算两个向量的模
+                #先计算中心点的模
+                try:
+                    temp2 = userIdNorms[ucid]
+                except KeyError:
+                    temp2 = getNorm(ucid, userratings)
+                    userIdNorms[ucid] = temp2
+                #再计算新选点的模
+                temp3 = getNorm(tempId, userratings)
+                #计算余弦值
+                cosValue = round(temp1/(temp2*temp3), 3)
+                #如果出现相似度比较大的情况，则放弃该点
+                if cosValue >= 0.6:
+                    break
+            #如果显示可用，就加入到中心点列表中
+            if stats:
+                userIds.append(tempId)
+    #设置userCenters
+    for ucid in userIds:
+        userCenters[ucid] = userratings[ucid]
     return userCenters
 
 #在得到初始点集合(是用户集，不是评分集)，以及所有用户评分集合的基础上，用欧式距离进行聚类
@@ -113,12 +151,15 @@ def getAverageCenters(movienum, ratingsDetail, usercenters, clusters):
     print u'平均', time.time() - start
     return averageCenters
         
-
+#k-means算法步骤
 #1.获取数据
 #2.取k个起始点
 #3.用欧式距离进行聚类
 #4.算每个聚类的平均中心
 #5.重复3,4步骤，直到聚类中心不再变化
+
+#优化步骤
+#
 
 if __name__ == '__main__':
     start = time.time()
@@ -127,6 +168,8 @@ if __name__ == '__main__':
     #选取初始k个中心点
     userCentersDetail = chooseKInitCenter(NUM_K, NUM_USER, ratingsDetail)
     #当平均中心点不等于上一次的中心点时，进行循环
+    print userCentersDetail.keys()
+    
     n = 1
     while True:
         clustersDetail = getUsersClusters(NUM_USER, NUM_MOVIE, userCentersDetail, ratingsDetail)
