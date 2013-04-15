@@ -25,7 +25,7 @@ FILEPATH_10M_ratings = PATH_DATA_FOLDER + "/ml-10M/ratings.dat"
 FILEPATH_10M_movies = PATH_DATA_FOLDER + "/ml-10M/movies.dat"
 
 #const numbers 
-NUM_K = 6
+NUM_K = 7
 NUM_USER = 943  #943,6040,71567
 NUM_MOVIE = 1682  #1682,3952,65133
 
@@ -100,37 +100,31 @@ def chooseKInitCenter(numk, usernum, userratings):
 def getUsersClusters(usernum, movienum, usercenters, userratings):
     start = time.time()
     clusters = {}
-    #所有初始结点的id
+    ucidMidSets = {}
+    #所有初始中心结点的id
     userCenterIds = usercenters.keys()
     #初始化k个聚类内为空列表
     for ucid in userCenterIds:
         clusters[ucid] = []
+        ucidMidSets[ucid] = set(usercenters[ucid])
     #循环遍历每一个用户
     for uid in range(1, usernum+1):
-        #存储uid的所有评分
-        uidRating = userratings[uid]
+        #存储uid的所有评分电影id
+        uidMidSet = set(userratings[uid])
         #设置哨兵点
-        minLenUcid = -1
-        maxLen = float("inf")
+        maxSameUcid = -1
+        maxSameRate = -1
         #计算uid和每个ucid的距离，并取距离最短的那一个ucid作为聚类号
         for ucid in userCenterIds:
-            #存储ucid的所有评分
-            ucidRating = usercenters[ucid]
-            tempLen = 0
-            #求uid和ucid的欧式距离
-            tempSet = set(uidRating) | set(ucidRating)
-            # print len(tempSet), len(set(uidRating)), len(set(ucidRating))
-            for mid in tempSet:
-                tempLen += pow(ucidRating.get(mid, 0) - uidRating.get(mid, 0), 2)
-            # for mid in ucidRating:
-            #     tempLen += pow(ucidRating[mid] - uidRating.get(mid, 0), 2)
-            # for mid in (set(uidRating)-set(ucidRating)):
-            #     tempLen += pow(uidRating[mid], 2)
-            tempLen = sqrt(tempLen)
-            if tempLen < maxLen:
-                (maxLen, minLenUcid) = (tempLen, ucid)
+            #存储ucid的所有评分电影id
+            ucidMidSet = ucidMidSets[ucid]
+            sameMidSet = uidMidSet & ucidMidSet
+            sameMidRate = float(len(sameMidSet)) / len(ucidMidSet)
+            if sameMidRate > maxSameRate:
+                (maxSameRate, maxSameUcid) = (sameMidRate, ucid)
         #划入距离最短的聚类
-        clusters[minLenUcid].append(uid)
+        # print uid,maxSameUcid,maxSameRate
+        clusters[maxSameUcid].append(uid)
     print u'聚类',time.time() - start
     return clusters
 
