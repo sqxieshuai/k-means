@@ -25,7 +25,7 @@ FILEPATH_10M_ratings = PATH_DATA_FOLDER + "/ml-10M/ratings.dat"
 FILEPATH_10M_movies = PATH_DATA_FOLDER + "/ml-10M/movies.dat"
 
 #const numbers 
-NUM_K = 5
+NUM_K = 6
 NUM_USER = 943  #943,6040,71567
 NUM_MOVIE = 1682  #1682,3952,65133
 
@@ -67,7 +67,7 @@ def chooseKInitCenter(numk, usernum, userratings):
         if tempId not in userIds :
             stats = True #记录此点是否可用
             #对于已经存在的每一个中心点，都和新选取的中心点计算余弦相似度
-            #如果任意一个大于阀值（0.6），就放弃新选取的点
+            #如果任意一个大于阀值（0.5），就放弃新选取的点
             for ucid in userIds:
                 #计算余弦相似度，先计算分子
                 temp1 = 0 #余弦相似度的分子
@@ -75,9 +75,9 @@ def chooseKInitCenter(numk, usernum, userratings):
                     temp1 += userratings[ucid][mid] * userratings[tempId].get(mid, 0)
                 #计算分母，分别计算两个向量的模
                 #先计算中心点的模
-                try:
+                if userIdNorms.has_key(ucid):
                     temp2 = userIdNorms[ucid]
-                except KeyError:
+                else:
                     temp2 = getNorm(ucid, userratings)
                     userIdNorms[ucid] = temp2
                 #再计算新选点的模
@@ -85,7 +85,8 @@ def chooseKInitCenter(numk, usernum, userratings):
                 #计算余弦值
                 cosValue = round(temp1/(temp2*temp3), 3)
                 #如果出现相似度比较大的情况，则放弃该点
-                if cosValue >= 0.6:
+                if cosValue >= 0.5:
+                    stats = False
                     break
             #如果显示可用，就加入到中心点列表中
             if stats:
@@ -108,7 +109,7 @@ def getUsersClusters(usernum, movienum, usercenters, userratings):
     for uid in range(1, usernum+1):
         #存储uid的所有评分
         uidRating = userratings[uid]
-        #设置哨兵比较点
+        #设置哨兵点
         minLenUcid = -1
         maxLen = float("inf")
         #计算uid和每个ucid的距离，并取距离最短的那一个ucid作为聚类号
@@ -117,12 +118,17 @@ def getUsersClusters(usernum, movienum, usercenters, userratings):
             ucidRating = usercenters[ucid]
             tempLen = 0
             #求uid和ucid的欧式距离
-            for mid in ucidRating.keys():
-                tempLen += pow(ucidRating[mid] - uidRating.get(mid, 0), 2)
-            for mid in (set(uidRating)-set(ucidRating)):
-                tempLen += pow(uidRating[mid], 2)
-            if sqrt(tempLen) < maxLen:
-                (maxLen, minLenUcid) = (sqrt(tempLen), ucid)
+            tempSet = set(uidRating) | set(ucidRating)
+            print len(tempSet), len(set(uidRating)), len(set(ucidRating))
+            for mid in tempSet:
+                tempLen += pow(ucidRating.get(mid, 0) - uidRating.get(mid, 0), 2)
+            # for mid in ucidRating:
+            #     tempLen += pow(ucidRating[mid] - uidRating.get(mid, 0), 2)
+            # for mid in (set(uidRating)-set(ucidRating)):
+            #     tempLen += pow(uidRating[mid], 2)
+            tempLen = sqrt(tempLen)
+            if tempLen < maxLen:
+                (maxLen, minLenUcid) = (tempLen, ucid)
         #划入距离最短的聚类
         clusters[minLenUcid].append(uid)
     print u'聚类',time.time() - start
@@ -133,7 +139,7 @@ def getAverageCenters(movienum, ratingsDetail, usercenters, clusters):
     start = time.time()
     averageCenters = {}
     #循环k个中心点
-    for ucid in usercenters.keys():
+    for ucid in usercenters:
         #初始化第i个中心点内，对所有电影的平均得分为0
         tempUserRatings = {}
         for i in range(1, movienum+1):
@@ -141,12 +147,15 @@ def getAverageCenters(movienum, ratingsDetail, usercenters, clusters):
         #循环遍历第i个中心点内的所有用户
         for uid in clusters[ucid]:
             #遍历该用户的所有评分，将tempUserRatings中对应的项增加该评分
-            for mid in ratingsDetail[uid].keys():
+            for mid in ratingsDetail[uid]:
                 tempUserRatings[mid] += ratingsDetail[uid][mid]
         #计算平均得分
         tempLen = len(clusters[ucid])
-        for mid in tempUserRatings.keys():
+        for mid in tempUserRatings:
             tempUserRatings[mid] = round(tempUserRatings[mid]/tempLen, 3)
+        for mid in tempUserRatings.keys():
+            if tempUserRatings[mid] == 0:
+                del tempUserRatings[mid]
         averageCenters[ucid] = tempUserRatings
     print u'平均', time.time() - start
     return averageCenters
@@ -169,7 +178,6 @@ if __name__ == '__main__':
     userCentersDetail = chooseKInitCenter(NUM_K, NUM_USER, ratingsDetail)
     #当平均中心点不等于上一次的中心点时，进行循环
     print userCentersDetail.keys()
-    
     n = 1
     while True:
         clustersDetail = getUsersClusters(NUM_USER, NUM_MOVIE, userCentersDetail, ratingsDetail)
