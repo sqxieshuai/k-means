@@ -114,30 +114,20 @@ def getUsersClusters(usernum, movienum, usercenters, userratings):
     return clusters
 
 #重新计算每个聚类的中心，用每个聚类的中间点（按评论电影的多少来排序）作为代表中心
-def getAverageCenters(movienum, userratings, usercenters, clusters):
+def getAverageCenters(userratings, clusters):
     start = time.time()
-    averageCenters = {}
+    userNewCenters = {}
     #循环k个中心点
-    for ucid in usercenters:
-        #初始化第i个中心点内，对所有电影的平均得分为0
-        tempUserRatings = {}
-        for i in range(1, movienum+1):
-            tempUserRatings[i] = 0.0
-        #循环遍历第i个中心点内的所有用户
+    for ucid in clusters:
+        #获取当前中心点内所有用户以及其评论过的电影数量，并排序
+        userMidLenSet = {}
         for uid in clusters[ucid]:
-            #遍历该用户的所有评分，将tempUserRatings中对应的项增加该评分
-            for mid in userratings[uid]:
-                tempUserRatings[mid] += userratings[uid][mid]
-        #计算平均得分
-        tempLen = float(len(clusters[ucid]))
-        for mid in range(1, movienum+1):
-            if tempUserRatings[mid] == 0:
-                del tempUserRatings[mid]
-            else:
-                tempUserRatings[mid] = round(tempUserRatings[mid]/tempLen, 3)
-        averageCenters[ucid] = tempUserRatings
+            userMidLenSet[uid] = len(userratings[uid])
+        tempSortedSet = sorted(userMidLenSet.items(), key=lambda item:item[1], reverse=False)
+        userNewCenterId = tempSortedSet[len(clusters[ucid]) / 2][0]
+        userNewCenters[userNewCenterId] = userratings[userNewCenterId]
     print u'平均', time.time() - start
-    return averageCenters
+    return userNewCenters
         
 #k-means算法步骤
 #1.获取数据
@@ -164,7 +154,7 @@ if __name__ == '__main__':
         for ucid in sorted(clustersDetail.keys()):
             print ucid,'\t',len(clustersDetail[ucid])
         print '********************'
-        averageCenters = getAverageCenters(NUM_MOVIE, ratingsDetail, userCentersDetail, clustersDetail)
+        averageCenters = getAverageCenters(ratingsDetail, clustersDetail)
         if userCentersDetail == averageCenters: 
             break
         else:
