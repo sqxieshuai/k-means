@@ -25,7 +25,7 @@ FILEPATH_10M_ratings = PATH_DATA_FOLDER + "/ml-10M/ratings.dat"
 FILEPATH_10M_movies = PATH_DATA_FOLDER + "/ml-10M/movies.dat"
 
 #const numbers 
-NUM_K = 5
+NUM_K = 30
 NUM_USER = 943  #943,6040,71567
 NUM_MOVIE = 1682  #1682,3952,65133
 
