@@ -30,10 +30,10 @@ NUM_USER = 943  #943,6040,71567
 NUM_MOVIE = 1682  #1682,3952,65133
 
 #小数据test
-FILEPATH_test = PATH_HERE + '/demo.txt'
-NUM_K = 2
-NUM_USER = 4
-NUM_MOVIE = 6
+# FILEPATH_test = PATH_HERE + '/demo.txt'
+# NUM_K = 3
+# NUM_USER = 7
+# NUM_MOVIE = 6
 
 #'\t','::','::'
 
@@ -48,52 +48,30 @@ def loadRatingsDetail(ratingDataFilepath):
     fp.close()
     return ratings
 
-#计算一个向量的模,保留三位小数
-def getNorm(uid, userratings):
-    temp = 0
-    for val in userratings[uid].values():
-        temp += pow(val, 2)
-    temp = round(sqrt(temp), 3)
-    return temp
-
-#返回两个用户所评电影相同的比例（交集/并集）
+#返回两个用户所评电影相同的比例,最后一个参数kind表示：当为uciduid时，返回（交集/ucid集）,默认返回（交集/并集）
 def getSameRate(uidOne, uidTwo, userratings):
-    setOne = userratings[uidOne]
-    setTwo = userratings[uidTwo]
+    setOne = set(userratings[uidOne])
+    setTwo = set(userratings[uidTwo])
     sameSet = setOne & setTwo
     allSet = setOne | setTwo
     return float(len(sameSet)) / len(allSet)
+        
     
 #从评分集合中挑选k个起始点,返回选出的集合
 def chooseKInitCenter(numk, usernum, userratings):
     userCenters = {}
-    userIdNorms = {} #存储中心点的模
     userIds = []
     #随机挑选k个用户
+    n = 0 
     while len(userIds) < numk :
         tempId = randint(1, usernum)
+        n += 1
         if tempId not in userIds :
             stats = True #记录此点是否可用
-            #对于已经存在的每一个中心点，都和新选取的中心点计算余弦相似度
-            #如果任意一个大于阀值（0.5），就放弃新选取的点
+            #对于已经存在的每一个中心点，都和新选取的中心点计算相同相似度
             for ucid in userIds:
-                # #计算余弦相似度，先计算分子
-                # temp1 = 0 #余弦相似度的分子
-                # for mid in userratings[ucid]:
-                #     temp1 += userratings[ucid][mid] * userratings[tempId].get(mid, 0)
-                # #计算分母，分别计算两个向量的模
-                # #先计算中心点的模
-                # if userIdNorms.has_key(ucid):
-                #     temp2 = userIdNorms[ucid]
-                # else:
-                #     temp2 = getNorm(ucid, userratings)
-                #     userIdNorms[ucid] = temp2
-                # #再计算新选点的模
-                # temp3 = getNorm(tempId, userratings)
-                # #计算余弦值
-                # cosValue = round(temp1/(temp2*temp3), 3)
-                # #如果出现相似度比较大的情况，则放弃该点
-                if cosValue >= 0.5:
+                #如果相似度大于0.2，则放弃该点
+                if getSameRate(ucid, tempId, userratings) >= 0.2:
                     stats = False
                     break
             #如果显示可用，就加入到中心点列表中
@@ -102,36 +80,40 @@ def chooseKInitCenter(numk, usernum, userratings):
     #设置userCenters
     for ucid in userIds:
         userCenters[ucid] = userratings[ucid]
+        # print u"初始中心点\t", u"中心点评论的电影数\t"
+        # print ucid, "\t", len(userratings[ucid].keys())
+    print n
     return userCenters
 
-#在得到初始点集合(是用户集，不是评分集)，以及所有用户评分集合的基础上，用欧式距离进行聚类
+#在得到初始点集合(是用户集，不是评分集)，以及所有用户评分集合的基础上，用相似度进行聚类
 def getUsersClusters(usernum, movienum, usercenters, userratings):
     start = time.time()
     clusters = {}
-    ucidMidSets = {}
     #所有初始中心结点的id
     userCenterIds = usercenters.keys()
     #初始化k个聚类内为空列表
     for ucid in userCenterIds:
         clusters[ucid] = []
-        ucidMidSets[ucid] = set(usercenters[ucid])
     #循环遍历每一个用户
     for uid in range(1, usernum+1):
-        #存储uid的所有评分电影id
-        uidMidSet = set(userratings[uid])
+        # print "uid\t", uid
         #设置哨兵点
-        maxSameUcid = -1
         maxSameRate = -1
-        #计算uid和每个ucid的距离，并取距离最短的那一个ucid作为聚类号
+        #计算uid和每个ucid的相似度，并取相似度最大的那一个ucid作为聚类号
         for ucid in userCenterIds:
             #存储ucid的所有评分电影id
-            ucidMidSet = ucidMidSets[ucid]
-            sameMidSet = uidMidSet & ucidMidSet
-            sameMidRate = float(len(sameMidSet)) / len(ucidMidSet)
+            ucidSet = set(usercenters[ucid])
+            uidSet = set(userratings[uid])
+            sameSet = ucidSet & uidSet
+            sameMidRate = float(len(sameSet)) / len(ucidSet)
+            # print "ucid\t", ucid, "\tsamemidRate\t", sameMidRate
+            if uid in userCenterIds:
+                print uid,ucid,sameMidRate
             if sameMidRate > maxSameRate:
                 (maxSameRate, maxSameUcid) = (sameMidRate, ucid)
         #划入距离最短的聚类
-        # print uid,maxSameUcid,maxSameRate
+        # print "maxSameUcid", maxSameUcid
+        # print "---"
         clusters[maxSameUcid].append(uid)
     print u'聚类',time.time() - start
     return clusters
@@ -161,8 +143,11 @@ def getAverageCenters(movienum, ratingsDetail, usercenters, clusters):
             else:
                 tempUserRatings[mid] = round(tempUserRatings[mid]/tempLen, 3)
         averageCenters[ucid] = tempUserRatings
+        # print u"平均中心点", "\t", u"中心点内评论电影数"
+        # print ucid, "\t", len(tempUserRatings.keys())
     print u'平均', time.time() - start
     return averageCenters
+        
         
 #k-means算法步骤
 #1.获取数据
@@ -177,7 +162,7 @@ def getAverageCenters(movienum, ratingsDetail, usercenters, clusters):
 if __name__ == '__main__':
     start = time.time()
     #获得用户对电影的评分
-    ratingsDetail = loadRatingsDetail(FILEPATH_test)
+    ratingsDetail = loadRatingsDetail(FILEPATH_100k_ratings) #FILEPATH_test,FILEPATH_100k_ratings
     #选取初始k个中心点
     userCentersDetail = chooseKInitCenter(NUM_K, NUM_USER, ratingsDetail)
     #当平均中心点不等于上一次的中心点时，进行循环

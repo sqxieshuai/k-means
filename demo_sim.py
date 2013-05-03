@@ -48,18 +48,16 @@ def loadRatingsDetail(ratingDataFilepath):
     fp.close()
     return ratings
 
-#返回两个用户所评电影相同的比例,最后一个参数kind表示：当为uciduid时，返回（交集/ucid集）,默认返回（交集/并集）
-def getSameRate(uidOne, uidTwo, userratings, *kind):
+#返回两个用户所评电影相同的比例,返回（交集/并集）
+def getSameRate(uidOne, uidTwo, userratings):
     setOne = set(userratings[uidOne])
     setTwo = set(userratings[uidTwo])
     sameSet = setOne & setTwo
     allSet = setOne | setTwo
-    if kind == "uciduid":
-        return float(len(sameSet)) / len(setOne)
     return float(len(sameSet)) / len(allSet)
         
     
-#从评分集合中挑选k个起始点,返回选出的集合
+#从评分集合中挑选k个起始点,返回每个选出的ucid中的uid列表
 def chooseKInitCenter(numk, usernum, userratings):
     userCenters = {}
     userIds = []
@@ -81,16 +79,16 @@ def chooseKInitCenter(numk, usernum, userratings):
                 userIds.append(tempId)
     #设置userCenters
     for ucid in userIds:
-        userCenters[ucid] = userratings[ucid]
+        userCenters[ucid] = userratings[ucid].keys()  #此处返回的中心点，只包含其评分的mid，不包含mid对应的评分值
     print n
     return userCenters
 
-#在得到初始点集合(是用户集，不是评分集)，以及所有用户评分集合的基础上，用相似度进行聚类
+#在得到初始点集合(是用户集，不是评分集)，以及所有用户评分集合的基础上，用相似度进行聚类，在进行聚类的过程中，不考虑评分值，值考虑用户间评过分的mid的相同率
 def getUsersClusters(usernum, movienum, usercenters, userratings):
     start = time.time()
     clusters = {}
     #所有初始中心结点的id
-    userCenterIds = usercenters.keys()
+    userCenterIds = usercenters.keys() #所有的ucid
     #初始化k个聚类内为空列表
     for ucid in userCenterIds:
         clusters[ucid] = []
@@ -102,30 +100,40 @@ def getUsersClusters(usernum, movienum, usercenters, userratings):
         #计算uid和每个ucid的相似度，并取相似度最大的那一个ucid作为聚类号
         for ucid in userCenterIds:
             #存储ucid的所有评分电影id
-            sameMidRate = getSameRate(ucid, uid, userratings, "uciduid")
+            #存储ucid的所有评分电影id
+            ucidSet = set(usercenters[ucid])
+            uidSet = set(userratings[uid])
+            sameSet = ucidSet & uidSet
+            allSet = ucidSet | uidSet
+            sameMidRate = float(len(sameSet)) / len(allSet)
             # print "ucid\t", ucid, "\tsamemidRate\t", sameMidRate
             if sameMidRate > maxSameRate:
                 (maxSameRate, maxSameUcid) = (sameMidRate, ucid)
-        #划入距离最短的聚类
+        #划入与中心点最相似的聚类中
         # print "maxSameUcid", maxSameUcid
-        # print "---"
-        clusters[maxSameUcid].append(uid)
+        # print "---"sssss
+        clusters[maxSameUcid].append(uid)  #聚类结果是ucid和其对应的uid
     print u'聚类',time.time() - start
     return clusters
 
-#重新计算每个聚类的中心，用每个聚类的中间点（按评论电影的多少来排序）作为代表中心
+#tempSortedSet = sorted(userMidLenSet.items(), key=lambda item:item[1], reverse=False)
+#重新计算每个聚类的中心
 def getAverageCenters(userratings, clusters):
     start = time.time()
     userNewCenters = {}
     #循环k个中心点
     for ucid in clusters:
-        #获取当前中心点内所有用户以及其评论过的电影数量，并排序
-        userMidLenSet = {}
+        userNewCenters[ucid] = []
+        tempMidNum = {}
+        clusterLength = float(len(clusters[ucid]))
         for uid in clusters[ucid]:
-            userMidLenSet[uid] = len(userratings[uid])
-        tempSortedSet = sorted(userMidLenSet.items(), key=lambda item:item[1], reverse=False)
-        userNewCenterId = tempSortedSet[len(clusters[ucid]) / 2][0]
-        userNewCenters[userNewCenterId] = userratings[userNewCenterId]
+            for mid in userratings[uid]:
+                tempMidNum[mid] = tempMidNum[mid] + 1 if tempMidNum.has_key(mid) else 1
+        for mid in tempMidNum:
+            tempMidNum[mid] /= clusterLength
+        tempMidNum = sorted(tempMidNum.items(), key=lambda item:item[1], reverse=True)[0:len(tempMidNum)/5+1]
+        for item in tempMidNum:
+            userNewCenters[ucid].append(item[0])  #返回的结果是ucid和其对应的聚类中出现频率排在前20%的mid
     print u'平均', time.time() - start
     return userNewCenters
         
