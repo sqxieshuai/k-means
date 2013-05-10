@@ -4,7 +4,7 @@ import os
 import time
 from random import randint
 from math import sqrt
-
+from hashlib import md5
 
 PATH_DATA_FOLDER = "D:\MovieLens\Data".replace("\\", "/")
 PATH_HERE = os.path.abspath("").replace("\\", "/")
@@ -70,8 +70,8 @@ def chooseKInitCenter(numk, usernum, userratings):
             stats = True #记录此点是否可用
             #对于已经存在的每一个中心点，都和新选取的中心点计算相同相似度
             for ucid in userIds:
-                #如果相似度大于0.2，则放弃该点
-                if getSameRate(ucid, tempId, userratings) >= 0.2:
+                #如果相似度大于0.3，则放弃该点
+                if getSameRate(ucid, tempId, userratings) >= 0.3:
                     stats = False
                     break
             #如果显示可用，就加入到中心点列表中
@@ -107,7 +107,7 @@ def getUsersClusters(usernum, movienum, usercenters, userratings):
             allSet = ucidSet | uidSet
             sameMidRate = float(len(sameSet)) / len(allSet)
             # print "ucid\t", ucid, "\tsamemidRate\t", sameMidRate
-            if sameMidRate > maxSameRate:
+            if sameMidRate >= maxSameRate:
                 (maxSameRate, maxSameUcid) = (sameMidRate, ucid)
         #划入与中心点最相似的聚类中
         # print "maxSameUcid", maxSameUcid
@@ -124,16 +124,22 @@ def getAverageCenters(userratings, clusters):
     #循环k个中心点
     for ucid in clusters:
         userNewCenters[ucid] = []
+        #每个电影id在此聚类中心出现的次数
         tempMidNum = {}
-        clusterLength = float(len(clusters[ucid]))
+        # #聚类内用户的数量
+        # clusterLength = float(len(clusters[ucid]))
+        #遍历聚类ucid内的每个用户
         for uid in clusters[ucid]:
+            #遍历用户的每个评过分的电影id
             for mid in userratings[uid]:
+                #将此聚类内，此电影id出现的次数+1
                 tempMidNum[mid] = tempMidNum[mid] + 1 if tempMidNum.has_key(mid) else 1
-        for mid in tempMidNum:
-            tempMidNum[mid] /= clusterLength
-        tempMidNum = sorted(tempMidNum.items(), key=lambda item:item[1], reverse=True)[0:len(tempMidNum)/5+1]
+        # for mid in tempMidNum:
+        #     #计算每个电影出现的均值
+        #     tempMidNum[mid] /= clusterLength
+        tempMidNum = sorted(tempMidNum.items(), key=lambda item:item[1], reverse=True)[0:len(tempMidNum)/4 + 1]
         for item in tempMidNum:
-            userNewCenters[ucid].append(item[0])  #返回的结果是ucid和其对应的聚类中出现频率排在前20%的mid
+            userNewCenters[ucid].append(item[0])  #返回的结果是ucid和其对应的聚类中出现频率排在前25%的mid
     print u'平均', time.time() - start
     return userNewCenters
         
@@ -156,7 +162,7 @@ if __name__ == '__main__':
     #当平均中心点不等于上一次的中心点时，进行循环
     print userCentersDetail.keys()
     n = 1
-    while True:
+    while True and n<40:
         clustersDetail = getUsersClusters(NUM_USER, NUM_MOVIE, userCentersDetail, ratingsDetail)
         print u"第%s次计算结果：\n聚类编号-类内元素个数:" % n
         for ucid in sorted(clustersDetail.keys()):
@@ -168,6 +174,24 @@ if __name__ == '__main__':
         else:
             userCentersDetail = averageCenters
             n += 1
-
     timeUsed = time.time() - start
-    print u"用时 %s 秒." % timeUsed
+    print u"生成聚类总用时 %s 秒." % timeUsed
+
+    for ucid in sorted(clustersDetail.keys()):
+        print ucid,'\t',len(clustersDetail[ucid])
+
+    clustersUcidList = sorted(clustersDetail.keys())
+    print sorted(clustersUcidList)
+    for i in range(len(clustersUcidList)):
+        for j in range(i+1, len(clustersUcidList)):
+            ucidi = clustersUcidList[i]
+            ucidj = clustersUcidList[j]
+            # print ucidi,ucidj,getSameRate(ucidi, ucidj, averageCenters)
+            if getSameRate(ucidi, ucidj, averageCenters) > 0.3:
+                clustersDetail[ucidj] += clustersDetail[ucidi]
+                del clustersDetail[ucidi]
+                averageCenters = getAverageCenters(ratingsDetail, clustersDetail)
+                break
+    
+    for ucid in sorted(clustersDetail.keys()):
+        print ucid,'\t',len(clustersDetail[ucid])
